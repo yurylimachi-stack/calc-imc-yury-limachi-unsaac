@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protege Tu Futuro 3D - Juego Educativo sobre Anticonceptivos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            overflow: hidden; 
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0a1a;
+            color: #fff;
+        }
+        #game-container { width: 100vw; height: 100vh; position: relative; }
+        canvas { display: block; }
+        
+        /* UI Overlay */
+        #ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #ui > * { pointer-events: auto; }
+        
+        #header {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #header h1 {
+            font-size: 1.4rem;
+            background: linear-gradient(90deg, #00e5ff, #ff4081);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+        #score-box {
+            background: rgba(0, 229, 255, 0.15);
+            border: 1px solid #00e5ff;
+            border-radius: 12px;
+            padding: 8px 18px;
+            font-size: 1.1rem;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.75);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        /* Modal */
+        #modal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        #modal.active { display: flex; }
+        
+        .modal-content {
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            border: 2px solid #00e5ff;
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 520px;
+            width: 92%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 0 40px rgba(0,229,255,0.3);
+            animation: popIn 0.3s ease;
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        
+        .modal-content h2 {
+            color: #00e5ff;
+            margin-bottom: 12px;
+            font-size: 1.5rem;
+        }
+        .modal-content .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        .badge.sti { background: #00c853; color: #000; }
+        .badge.preg { background: #ff9800; color: #000; }
+        .badge.both { background: linear-gradient(90deg, #00c853, #ff9800); color: #000; }
+        .badge.none { background: #f44336; color: #fff; }
+        
+        .modal-content p, .modal-content ul {
+            line-height: 1.6;
+            margin-bottom: 12px;
+            color: #e0e0e0;
+        }
+        .modal-content ul { padding-left: 20px; }
+        .modal-content li { margin-bottom: 6px; }
+        
+        .efficacy {
+            background: rgba(0,229,255,0.1);
+            border-left: 4px solid #00e5ff;
+            padding: 10px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .quiz-section {
+            margin-top: 20px;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding-top: 18px;
+        }
+        .quiz-section h3 { color: #ff4081; margin-bottom: 12px; }
+        
+        .quiz-btn {
+            display: block;
+            width: 100%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 12px 16px;
+            margin: 8px 0;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .quiz-btn:hover { background: rgba(0,229,255,0.2); border-color: #00e5ff; }
+        .quiz-btn.correct { background: rgba(0,200,83,0.3); border-color: #00c853; }
+        .quiz-btn.wrong { background: rgba(244,67,54,0.3); border-color: #f44336; }
+        
+        .close-btn, .next-btn {
+            margin-top: 18px;
+            background: linear-gradient(90deg, #00e5ff, #00bcd4);
+            color: #000;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 25px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 1rem;
+            width: 100%;
+        }
+        .close-btn:hover, .next-btn:hover { filter: brightness(1.1); }
+        
+        /* Start Screen */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            text-align: center;
+            padding: 20px;
+        }
+        #start-screen h1 {
+            font-size: 2.8rem;
+            background: linear-gradient(90deg, #00e5ff, #ff4081, #ffeb3b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        #start-screen .subtitle {
+            font-size: 1.2rem;
+            color: #b0bec5;
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+        #start-screen .info-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 480px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+        #start-screen .info-box h3 { color: #00e5ff; margin-bottom: 10px; }
+        #start-screen .info-box ul { padding-left: 20px; color: #cfd8dc; }
+        #start-screen .info-box li { margin: 6px 0; }
+        
+        #start-btn {
+            background: linear-gradient(90deg, #ff4081, #e91e63);
+            color: white;
+            border: none;
+            padding: 16px 48px;
+            font-size: 1.3rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 700;
+            box-shadow: 0 8px 25px rgba(233,30,99,0.4);
+            transition: transform 0.2s;
+        }
+        #start-btn:hover { transform: scale(1.05); }
+        
+        /* End / Result */
+        #result-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            justify-content: center;
+            align-items: center;
+            z-index: 150;
+            flex-direction: column;
+            text-align: center;
+            padding: 20px;
+        }
+        #result-screen.active { display: flex; }
+        #result-screen h2 { font-size: 2.2rem; color: #00e5ff; margin-bottom: 15px; }
+        #result-screen p { font-size: 1.2rem; max-width: 500px; margin-bottom: 20px; color: #e0e0e0; }
+        
+        /* Mobile controls hint */
+        #mobile-hint {
+            display: none;
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+        @media (max-width: 768px) {
+            #mobile-hint { display: block; }
+            #header h1 { font-size: 1.1rem; }
+            #instructions { font-size: 0.8rem; bottom: 10px; }
+        }
+        
+        /* Progress bar */
+        #progress {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            height: 8px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #00e5ff, #ff4081);
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+        #progress-text {
+            position: absolute;
+            top: 82px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.85rem;
+            color: #b0bec5;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="start-screen">
+            <h1>🛡️ Protege Tu Futuro 3D</h1>
+            <p class="subtitle">Un juego educativo para adolescentes sobre métodos anticonceptivos, prevención de ITS y embarazos no deseados.</p>
+            <div class="info-box">
+                <h3>🎯 Objetivo</h3>
+                <ul>
+                    <li>Explora el espacio 3D y acércate a cada estación de métodos anticonceptivos.</li>
+                    <li>Aprende sobre su eficacia, protección contra ITS y uso correcto.</li>
+                    <li>Responde las preguntas para ganar puntos de conciencia.</li>
+                    <li>¡La doble protección (condón + otro método) es clave!</li>
+                </ul>
+            </div>
+            <div class="info-box">
+                <h3>🕹️ Controles</h3>
+                <ul>
+                    <li><strong>WASD</strong> o flechas: Moverte</li>
+                    <li><strong>Mouse</strong>: Mirar alrededor (clic para activar)</li>
+                    <li><strong>E</strong> o clic en objeto: Interactuar</li>
+                    <li>Espacio: Saltar (opcional)</li>
+                </ul>
+            </div>
+            <button id="start-btn">Comenzar Aventura</button>
+            <p style="margin-top:20px; font-size:0.85rem; color:#78909c;">Basado en información de fuentes confiables (OMS, AAP, sociedades de pediatría). No sustituye consejo médico profesional.</p>
+        </div>
+        
+        <div id="ui">
+            <div id="header">
+                <h1>🛡️ Protege Tu Futuro</h1>
+                <div id="score-box">Puntos: <span id="score">0</span></div>
+            </div>
+            <div id="progress"><div id="progress-bar"></div></div>
+            <div id="progress-text">Estaciones visitadas: 0 / 8</div>
+            <div id="instructions">Acércate a un método (el objeto brillará) y pulsa <strong>E</strong> o haz clic para aprender</div>
+            <div id="mobile-hint">En móvil: toca y arrastra para mirar • WASD para mover</div>
+        </div>
+        
+        <div id="modal">
+            <div class="modal-content" id="modal-body">
+                <!-- Content injected by JS -->
+            </div>
+        </div>
+        
+        <div id="result-screen">
+            <h2 id="result-title">¡Felicidades!</h2>
+            <p id="result-text"></p>
+            <button class="next-btn" onclick="location.reload()">Jugar de nuevo</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // ========== DATA: Métodos anticonceptivos (información precisa y educativa) ==========
+        const methods = [
+            {
+                id: 'condon',
+                name: 'Preservativo (Condón) masculino',
+                color: 0x00e676,
+                position: new THREE.Vector3(-8, 1.2, -6),
+                badge: 'both',
+                badgeText: 'Protege de ITS + Embarazo',
+                description: 'El método de barrera más importante para adolescentes. Se coloca en el pene erecto antes de cualquier contacto genital.',
+                points: [
+                    'Único método de uso común que protege eficazmente contra la mayoría de ITS (incluyendo VIH, gonorrea, clamidia, sífilis).',
+                    'Reduce también el riesgo de VPH y herpes cuando se usa correctamente.',
+                    'Eficacia típica contra embarazo: ~85% (13-18 embarazos por 100 parejas/año). Con uso perfecto ~98%.',
+                    'Barato, fácil de conseguir, no necesita receta médica.',
+                    'Debe usarse en CADA relación sexual desde el principio hasta el final.'
+                ],
+                efficacy: 'Eficacia alta contra ITS. Eficacia buena-moderada contra embarazo (depende del uso correcto).',
+                tip: '💡 Consejo: Combínalo siempre con otro método (doble protección) para máxima seguridad.',
+                quiz: {
+                    question: '¿Cuál es la principal ventaja del condón frente a otros métodos hormonales?',
+                    options: [
+                        'Es más efectivo para prevenir embarazos',
+                        'Protege también contra infecciones de transmisión sexual (ITS)',
+                        'No tiene ningún efecto secundario nunca',
+                        'Se puede usar después de la relación sexual'
+                    ],
+                    correct: 1,
+                    explanation: 'Correcto. El condón es el único método de uso frecuente que protege contra ITS además del embarazo. Los hormonales y LARC solo previenen embarazo.'
+                }
+            },
+            {
+                id: 'condon-fem',
+                name: 'Preservativo interno (femenino)',
+                color: 0x69f0ae,
+                position: new THREE.Vector3(-5, 1.2, -9),
+                badge: 'both',
+                badgeText: 'Protege de ITS + Embarazo',
+                description: 'Funda de poliuretano o nitrilo que se inserta en la vagina. Puede colocarse hasta 8 horas antes.',
+                points: [
+                    'También protege contra ITS y embarazo.',
+                    'La persona que tiene vagina controla su uso.',
+                    'Puede usarse si hay alergia al látex (el masculino).',
+                    'Eficacia similar al condón masculino cuando se usa correctamente.',
+                    'Menos disponible y un poco más caro, pero muy útil.'
+                ],
+                efficacy: 'Protección dual (ITS + embarazo). Eficacia típica ~79-85%.',
+                tip: '💡 Ideal cuando se quiere control por parte de la persona con vagina o hay alergia al látex.',
+                quiz: {
+                    question: '¿Cuándo se puede colocar el preservativo interno?',
+                    options: [
+                        'Solo durante la penetración',
+                        'Hasta 8 horas antes de la relación',
+                        'Después de eyacular',
+                        'Solo si se usa espermicida'
+                    ],
+                    correct: 1,
+                    explanation: 'Correcto. Se puede insertar con anticipación, lo que evita interrumpir el momento.'
+                }
+            },
+            {
+                id: 'pildora',
+                name: 'Píldora anticonceptiva',
+                color: 0xff4081,
+                position: new THREE.Vector3(0, 1.2, -8),
+                badge: 'preg',
+                badgeText: 'Solo previene embarazo',
+                description: 'Anticonceptivo hormonal oral. Hay combinadas (estrógeno + progestágeno) y de solo progestágeno.',
+                points: [
+                    'Alta eficacia si se toma todos los días a la misma hora (uso perfecto ~99%, típico ~91-93%).',
+                    'NO protege contra ITS. Debe combinarse con condón.',
+                    'Puede regular el ciclo, reducir acné y dolores menstruales.',
+                    'Requiere receta médica y seguimiento.',
+                    'En adolescentes el olvido es frecuente → baja la eficacia real.'
+                ],
+                efficacy: 'Muy alta con uso perfecto. No protege de ITS.',
+                tip: '💡 Usa alarma diaria. Si olvidas pastillas, consulta sobre anticoncepción de emergencia y usa condón.',
+                quiz: {
+                    question: 'Si tomas la píldora de forma perfecta, ¿protege también de las ITS?',
+                    options: [
+                        'Sí, al 100%',
+                        'Sí, parcialmente',
+                        'No, solo previene el embarazo',
+                        'Solo si es de solo progestágeno'
+                    ],
+                    correct: 2,
+                    explanation: 'Correcto. Ningún método hormonal protege contra ITS. Siempre se recomienda doble protección (píldora + condón).'
+                }
+            },
+            {
+                id: 'implante',
+                name: 'Implante subdérmico',
+                color: 0x7c4dff,
+                position: new THREE.Vector3(6, 1.2, -7),
+                badge: 'preg',
+                badgeText: 'Solo previene embarazo (LARC)',
+                description: 'Pequeña varilla que se inserta bajo la piel del brazo. Libera progestágeno de forma continua.',
+                points: [
+                    'Uno de los más eficaces que existen (>99%). Casi no depende del usuario.',
+                    'Dura 3 a 5 años según el tipo.',
+                    'Reversible: se retira y la fertilidad vuelve rápido.',
+                    'NO protege contra ITS → usa siempre condón además.',
+                    'Muy recomendado por OMS y sociedades médicas para adolescentes (LARC de primera línea).'
+                ],
+                efficacy: 'Eficacia >99%. No depende de la memoria diaria. Sin protección ITS.',
+                tip: '💡 Ideal si quieres “olvidarte” del método por años. Siempre combina con condón para ITS.',
+                quiz: {
+                    question: '¿Por qué se recomiendan mucho los LARC (implante/DIU) en adolescentes?',
+                    options: [
+                        'Porque son baratos y se venden en farmacia',
+                        'Porque tienen eficacia muy alta y no dependen de recordar tomarlos cada día',
+                        'Porque protegen de todas las ITS',
+                        'Porque son definitivos e irreversibles'
+                    ],
+                    correct: 1,
+                    explanation: 'Exacto. Los LARC tienen la mayor eficacia porque el cumplimiento no depende de la persona cada día. Son reversibles.'
+                }
+            },
+            {
+                id: 'diu',
+                name: 'DIU (Dispositivo Intrauterino)',
+                color: 0x448aff,
+                position: new THREE.Vector3(9, 1.2, -4),
+                badge: 'preg',
+                badgeText: 'Solo previene embarazo (LARC)',
+                description: 'Dispositivo en forma de T que se coloca dentro del útero. Hay de cobre y hormonales (levonorgestrel).',
+                points: [
+                    'Eficacia >99%. Uno de los métodos más seguros y de larga duración.',
+                    'Cobre: dura hasta 10-12 años, sin hormonas. Hormonal: 3 a 8 años según modelo.',
+                    'Puede usarse en adolescentes (incluso nulíparas) según guías actuales de OMS/AAP.',
+                    'NO protege de ITS. El riesgo de infección es bajo si se coloca correctamente.',
+                    'Requiere inserción por profesional de salud.'
+                ],
+                efficacy: 'Eficacia superior al 99%. Larga duración. Sin protección ITS.',
+                tip: '💡 Después de colocarlo, sigue siendo fundamental el uso de condón para prevenir ITS.',
+                quiz: {
+                    question: 'Según las recomendaciones actuales, ¿pueden las adolescentes usar DIU?',
+                    options: [
+                        'No, solo después de haber tenido hijos',
+                        'Sí, es seguro y altamente eficaz también en adolescentes',
+                        'Solo el de cobre, nunca el hormonal',
+                        'Solo si tienen más de 18 años'
+                    ],
+                    correct: 1,
+                    explanation: 'Correcto. Las guías actuales (OMS, AAP, etc.) consideran el DIU seguro y recomendable también en adolescentes nulíparas.'
+                }
+            },
+            {
+                id: 'inyeccion',
+                name: 'Inyección anticonceptiva',
+                color: 0xff6e40,
+                position: new THREE.Vector3(5, 1.2, 2),
+                badge: 'preg',
+                badgeText: 'Solo previene embarazo',
+                description: 'Inyección de progestágeno que se aplica cada 1 a 3 meses según el tipo (ej. Depo-Provera cada 3 meses).',
+                points: [
+                    'Eficacia alta con uso correcto (~94-99%).',
+                    'No hay que recordar pastillas diarias.',
+                    'Puede causar cambios en el sangrado menstrual y, a largo plazo, afectar densidad ósea (recuperable).',
+                    'NO protege de ITS.',
+                    'Requiere acudir al centro de salud periódicamente.'
+                ],
+                efficacy: 'Alta si se cumplen las citas. Sin protección ITS.',
+                tip: '💡 Programa recordatorios de las citas de reinfiltración. Combina siempre con condón.',
+                quiz: {
+                    question: 'La inyección anticonceptiva protege de las ITS?',
+                    options: [
+                        'Sí, porque es hormonal fuerte',
+                        'Solo de algunas como el VPH',
+                        'No, ninguna inyección hormonal protege de ITS',
+                        'Sí, si se combina con vitaminas'
+                    ],
+                    correct: 2,
+                    explanation: 'Correcto. Ningún método hormonal (píldora, inyección, implante, parche, anillo) protege contra ITS.'
+                }
+            },
+            {
+                id: 'emergencia',
+                name: 'Anticoncepción de emergencia',
+                color: 0xffeb3b,
+                position: new THREE.Vector3(-3, 1.2, 4),
+                badge: 'preg',
+                badgeText: 'Solo previene embarazo (después)',
+                description: 'Métodos para usar DESPUÉS de una relación sexual sin protección o con falla del método (rotura de condón, olvido de pastillas, etc.).',
+                points: [
+                    'Píldora de levonorgestrel (hasta 72h, mejor cuanto antes) o ulipristal (hasta 120h).',
+                    'DIU de cobre también es anticoncepción de emergencia muy eficaz (hasta 5 días).',
+                    'NO es un método de uso regular. No protege de ITS.',
+                    'No es abortiva: impide o retrasa la ovulación / fertilización.',
+                    'Toda adolescente debe saber que existe y dónde conseguirla.'
+                ],
+                efficacy: 'Reduce significativamente el riesgo de embarazo si se usa a tiempo. No es 100%.',
+                tip: '💡 Si la usas, es señal de que necesitas un método regular + condón. Consulta a un profesional.',
+                quiz: {
+                    question: '¿La anticoncepción de emergencia es lo mismo que un aborto?',
+                    options: [
+                        'Sí, siempre',
+                        'No, actúa antes de que se produzca el embarazo (impide ovulación/fertilización)',
+                        'Solo si se toma después de 5 días',
+                        'Depende de la marca'
+                    ],
+                    correct: 1,
+                    explanation: 'Correcto. La anticoncepción de emergencia no interrumpe un embarazo ya establecido. Actúa previniendo la ovulación o la fertilización.'
+                }
+            },
+            {
+                id: 'abstinencia',
+                name: 'Abstinencia / Decisiones informadas',
+                color: 0xffffff,
+                position: new THREE.Vector3(-7, 1.2, 1),
+                badge: 'both',
+                badgeText: '100% eficaz si se mantiene',
+                description: 'No tener relaciones sexuales con penetración. También incluye posponer el inicio sexual hasta sentirse preparado/a.',
+                points: [
+                    'Es el único método 100% eficaz contra embarazo e ITS cuando se practica de forma consistente.',
+                    'Es una decisión personal válida y respetable en cualquier momento.',
+                    'Incluye saber decir “no”, negociar límites y respetar los de la otra persona.',
+                    'Muchas personas eligen abstinencia en ciertas etapas o con ciertas parejas.',
+                    'La educación sexual integral incluye esta opción sin presión ni juicio.'
+                ],
+                efficacy: '100% cuando se mantiene. En la práctica real muchos adolescentes que planean abstinencia terminan teniendo relaciones, por lo que es importante conocer también otros métodos.',
+                tip: '💡 Tener información sobre todos los métodos te permite decidir libremente y con seguridad cuando llegue el momento.',
+                quiz: {
+                    question: '¿Cuál es el único método 100% efectivo contra embarazo e ITS?',
+                    options: [
+                        'El condón usado perfectamente',
+                        'El implante + condón',
+                        'La abstinencia consistente (no tener sexo con penetración)',
+                        'La píldora del día siguiente'
+                    ],
+                    correct: 2,
+                    explanation: 'Correcto. Solo la abstinencia completa y consistente ofrece 100% de protección. El resto reduce el riesgo pero no lo elimina al 100%.'
+                }
+            }
+        ];
+
+        // ========== GAME STATE ==========
+        let score = 0;
+        let visited = new Set();
+        let quizAnswered = new Set();
+        let currentMethod = null;
+        let isLocked = false;
+
+        // ========== THREE.JS SETUP ==========
+        const container = document.getElementById('game-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0d0d2b);
+        scene.fog = new THREE.Fog(0x0d0d2b, 20, 50);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 2.2, 12);
+        camera.lookAt(0, 1, -2);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // Lights - brighter for better visibility
+        const ambient = new THREE.AmbientLight(0x606080, 0.85);
+        scene.add(ambient);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.1);
+        dirLight.position.set(5, 18, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+        const point1 = new THREE.PointLight(0x00e5ff, 0.8, 25);
+        point1.position.set(-10, 6, -5);
+        scene.add(point1);
+        const point2 = new THREE.PointLight(0xff4081, 0.7, 25);
+        point2.position.set(10, 6, 5);
+        scene.add(point2);
+        const point3 = new THREE.PointLight(0xffffff, 0.4, 30);
+        point3.position.set(0, 8, 0);
+        scene.add(point3);
+
+        // Floor
+        const floorGeo = new THREE.PlaneGeometry(40, 40);
+        const floorMat = new THREE.MeshStandardMaterial({ 
+            color: 0x1a1a2e, 
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // Grid helper subtle
+        const grid = new THREE.GridHelper(40, 40, 0x222244, 0x111122);
+        scene.add(grid);
+
+        // Decorative elements (simple buildings / pillars)
+        function createPillar(x, z, h = 4) {
+            const geo = new THREE.CylinderGeometry(0.4, 0.5, h, 8);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a4a, roughness: 0.7 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, h/2, z);
+            mesh.castShadow = true;
+            scene.add(mesh);
+        }
+        createPillar(-12, -12);
+        createPillar(12, -12);
+        createPillar(-12, 12);
+        createPillar(12, 12);
+        createPillar(0, -14, 6);
+
+        // Central platform
+        const platform = new THREE.Mesh(
+            new THREE.CylinderGeometry(3, 3.5, 0.3, 32),
+            new THREE.MeshStandardMaterial({ color: 0x16213e, metalness: 0.3 })
+        );
+        platform.position.y = 0.15;
+        scene.add(platform);
+
+        // Title floating text simulation with sprite-like
+        const titleCanvas = document.createElement('canvas');
+        titleCanvas.width = 512; titleCanvas.height = 128;
+        const ctx = titleCanvas.getContext('2d');
+        ctx.fillStyle = '#00e5ff';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('PROTEGE TU FUTURO', 256, 70);
+        const titleTex = new THREE.CanvasTexture(titleCanvas);
+        const titleSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: titleTex, transparent: true }));
+        titleSprite.position.set(0, 5, -12);
+        titleSprite.scale.set(8, 2, 1);
+        scene.add(titleSprite);
+
+        // ========== METHOD OBJECTS ==========
+        const methodMeshes = [];
+        const interactDistance = 3.5;
+
+        methods.forEach((m, i) => {
+            // Base pedestal
+            const pedestal = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.7, 0.9, 0.4, 16),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a2e, metalness: 0.4 })
+            );
+            pedestal.position.copy(m.position);
+            pedestal.position.y = 0.2;
+            scene.add(pedestal);
+
+            // Main object (different shapes)
+            let geo;
+            if (m.id === 'condon' || m.id === 'condon-fem') {
+                geo = new THREE.CapsuleGeometry(0.25, 0.8, 4, 12);
+            } else if (m.id === 'implante') {
+                geo = new THREE.CapsuleGeometry(0.12, 1.0, 4, 8);
+            } else if (m.id === 'diu') {
+                geo = new THREE.TorusGeometry(0.35, 0.08, 8, 16);
+            } else if (m.id === 'pildora') {
+                geo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 16);
+            } else if (m.id === 'inyeccion') {
+                geo = new THREE.CylinderGeometry(0.15, 0.15, 0.9, 8);
+            } else if (m.id === 'emergencia') {
+                geo = new THREE.BoxGeometry(0.5, 0.3, 0.7);
+            } else {
+                geo = new THREE.OctahedronGeometry(0.5);
+            }
+
+            const mat = new THREE.MeshStandardMaterial({
+                color: m.color,
+                emissive: m.color,
+                emissiveIntensity: 0.25,
+                metalness: 0.3,
+                roughness: 0.4
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(m.position);
+            mesh.position.y = 1.2;
+            mesh.castShadow = true;
+            mesh.userData = { method: m, originalY: 1.2, index: i };
+            scene.add(mesh);
+            methodMeshes.push(mesh);
+
+            // Glow ring
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(0.9, 0.05, 8, 32),
+                new THREE.MeshBasicMaterial({ color: m.color, transparent: true, opacity: 0.4 })
+            );
+            ring.position.copy(m.position);
+            ring.position.y = 0.45;
+            ring.rotation.x = Math.PI / 2;
+            scene.add(ring);
+
+            // Label
+            const labelCanvas = document.createElement('canvas');
+            labelCanvas.width = 256; labelCanvas.height = 64;
+            const lctx = labelCanvas.getContext('2d');
+            lctx.fillStyle = 'rgba(0,0,0,0.7)';
+            lctx.fillRect(0, 0, 256, 64);
+            lctx.fillStyle = '#ffffff';
+            lctx.font = 'bold 22px Arial';
+            lctx.textAlign = 'center';
+            // Short name
+            const shortName = m.name.split(' ')[0] + (m.name.includes('interno') ? ' ♀' : m.name.includes('masculino') ? ' ♂' : '');
+            lctx.fillText(shortName.length > 14 ? m.name.substring(0,12)+'…' : shortName, 128, 40);
+            const labelTex = new THREE.CanvasTexture(labelCanvas);
+            const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true }));
+            label.position.copy(m.position);
+            label.position.y = 2.2;
+            label.scale.set(2.2, 0.55, 1);
+            scene.add(label);
+        });
+
+        // ========== CONTROLS ==========
+        const controls = new PointerLockControls(camera, document.body);
+        scene.add(controls.getObject());
+
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let canJump = false;
+        const objects = []; // for simple collision later if needed
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = true; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = true; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = true; break;
+                case 'ArrowRight': case 'KeyD': moveRight = true; break;
+                case 'Space': if (canJump) { velocity.y += 8; canJump = false; } break;
+                case 'KeyE': tryInteract(); break;
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            switch (e.code) {
+                case 'ArrowUp': case 'KeyW': moveForward = false; break;
+                case 'ArrowDown': case 'KeyS': moveBackward = false; break;
+                case 'ArrowLeft': case 'KeyA': moveLeft = false; break;
+                case 'ArrowRight': case 'KeyD': moveRight = false; break;
+            }
+        });
+
+        // Click to lock (only after start screen is hidden and modal is closed)
+        renderer.domElement.addEventListener('click', () => {
+            const startScreen = document.getElementById('start-screen');
+            if (startScreen.style.display !== 'none') return;
+            if (!isLocked && !document.getElementById('modal').classList.contains('active')) {
+                controls.lock();
+            }
+        });
+
+        controls.addEventListener('lock', () => { isLocked = true; });
+        controls.addEventListener('unlock', () => { isLocked = false; });
+
+        // ========== INTERACTION ==========
+        function tryInteract() {
+            if (document.getElementById('modal').classList.contains('active')) return;
+            const playerPos = controls.getObject().position;
+            let closest = null;
+            let minDist = interactDistance;
+
+            methodMeshes.forEach(mesh => {
+                const dist = playerPos.distanceTo(mesh.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = mesh;
+                }
+            });
+
+            if (closest) {
+                openModal(closest.userData.method);
+            }
+        }
+
+        // Also allow click on objects (raycast)
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (!isLocked) return;
+            mouse.x = 0; mouse.y = 0; // center when locked
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(methodMeshes);
+            if (intersects.length > 0 && intersects[0].distance < interactDistance + 1) {
+                openModal(intersects[0].object.userData.method);
+            }
+        });
+
+        function openModal(method) {
+            currentMethod = method;
+            controls.unlock();
+            const modal = document.getElementById('modal');
+            const body = document.getElementById('modal-body');
+            
+            const badgeClass = method.badge;
+            let html = `
+                <h2>${method.name}</h2>
+                <span class="badge ${badgeClass}">${method.badgeText}</span>
+                <p>${method.description}</p>
+                <ul>
+                    ${method.points.map(p => `<li>${p}</li>`).join('')}
+                </ul>
+                <div class="efficacy"><strong>Eficacia:</strong> ${method.efficacy}</div>
+                <p style="color:#80deea; font-style:italic;">${method.tip}</p>
+            `;
+
+            if (!quizAnswered.has(method.id)) {
+                html += `
+                    <div class="quiz-section">
+                        <h3>❓ Pregunta de conciencia</h3>
+                        <p>${method.quiz.question}</p>
+                        <div id="quiz-options">
+                            ${method.quiz.options.map((opt, i) => 
+                                `<button class="quiz-btn" data-index="${i}">${opt}</button>`
+                            ).join('')}
+                        </div>
+                        <p id="quiz-feedback" style="margin-top:12px; display:none;"></p>
+                    </div>
+                `;
+            } else {
+                html += `<p style="color:#00c853; margin-top:15px;">✅ Ya respondiste esta estación (+puntos obtenidos)</p>`;
+            }
+
+            html += `<button class="close-btn" id="close-modal">Cerrar y seguir explorando</button>`;
+            body.innerHTML = html;
+            modal.classList.add('active');
+
+            // Quiz handlers
+            if (!quizAnswered.has(method.id)) {
+                document.querySelectorAll('.quiz-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const idx = parseInt(btn.dataset.index);
+                        const correct = method.quiz.correct;
+                        document.querySelectorAll('.quiz-btn').forEach(b => b.disabled = true);
+                        
+                        if (idx === correct) {
+                            btn.classList.add('correct');
+                            score += 15;
+                            document.getElementById('quiz-feedback').style.display = 'block';
+                            document.getElementById('quiz-feedback').style.color = '#00c853';
+                            document.getElementById('quiz-feedback').textContent = '✅ ' + method.quiz.explanation;
+                        } else {
+                            btn.classList.add('wrong');
+                            document.querySelectorAll('.quiz-btn')[correct].classList.add('correct');
+                            score += 5; // participation points
+                            document.getElementById('quiz-feedback').style.display = 'block';
+                            document.getElementById('quiz-feedback').style.color = '#ff9800';
+                            document.getElementById('quiz-feedback').textContent = '❌ ' + method.quiz.explanation;
+                        }
+                        quizAnswered.add(method.id);
+                        updateUI();
+                    });
+                });
+            }
+
+            document.getElementById('close-modal').addEventListener('click', closeModal);
+            
+            if (!visited.has(method.id)) {
+                visited.add(method.id);
+                score += 10; // visit points
+                updateUI();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+            currentMethod = null;
+            // Re-lock if player wants
+            setTimeout(() => {
+                if (!document.getElementById('result-screen').classList.contains('active')) {
+                    controls.lock();
+                }
+            }, 100);
+            
+            // Check completion
+            if (visited.size >= methods.length && quizAnswered.size >= methods.length) {
+                setTimeout(showResults, 600);
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            const pct = (visited.size / methods.length) * 100;
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = `Estaciones visitadas: ${visited.size} / ${methods.length}`;
+        }
+
+        function showResults() {
+            controls.unlock();
+            const result = document.getElementById('result-screen');
+            const maxScore = methods.length * 10 + methods.length * 15; // 200
+            let msg = '';
+            let title = '';
+            if (score >= 160) {
+                title = '🏆 ¡Experto en Protección!';
+                msg = `Has obtenido ${score} puntos. Dominas los conceptos clave: doble protección, LARC, importancia del condón para ITS y decisión informada. ¡Comparte este conocimiento!`;
+            } else if (score >= 120) {
+                title = '🌟 ¡Muy bien informado/a!';
+                msg = `Has obtenido ${score} puntos. Conoces los métodos principales y la importancia de protegerte de ITS y embarazos. Sigue aprendiendo y consulta siempre a profesionales de salud.`;
+            } else {
+                title = '📚 Buen comienzo';
+                msg = `Has obtenido ${score} puntos. Has explorado todos los métodos. Revisa de nuevo las estaciones para reforzar los conceptos de doble protección y eficacia.`;
+            }
+            msg += `<br><br><strong>Recuerda:</strong> Este juego es educativo. Para elegir un método, habla con un médico, enfermera o centro de salud amigable para adolescentes. La información es poder.`;
+            document.getElementById('result-title').textContent = title;
+            document.getElementById('result-text').innerHTML = msg;
+            result.classList.add('active');
+        }
+
+        // ========== ANIMATION LOOP ==========
+        const clock = new THREE.Clock();
+        let prevTime = performance.now();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+            prevTime = time;
+
+            // Movement
+            if (isLocked) {
+                velocity.x -= velocity.x * 8.0 * delta;
+                velocity.z -= velocity.z * 8.0 * delta;
+                velocity.y -= 9.8 * 4.0 * delta; // gravity
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 25.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 25.0 * delta;
+
+                controls.moveRight(-velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+                controls.getObject().position.y += velocity.y * delta;
+
+                // Floor collision
+                if (controls.getObject().position.y < 1.7) {
+                    velocity.y = 0;
+                    controls.getObject().position.y = 1.7;
+                    canJump = true;
+                }
+
+                // Boundaries
+                const pos = controls.getObject().position;
+                pos.x = Math.max(-18, Math.min(18, pos.x));
+                pos.z = Math.max(-18, Math.min(18, pos.z));
+            }
+
+            // Animate method objects (float + rotate)
+            const t = clock.getElapsedTime();
+            methodMeshes.forEach((mesh, i) => {
+                mesh.position.y = mesh.userData.originalY + Math.sin(t * 1.5 + i) * 0.15;
+                mesh.rotation.y += 0.01;
+                // Highlight if close
+                const dist = controls.getObject().position.distanceTo(mesh.position);
+                if (dist < interactDistance) {
+                    mesh.material.emissiveIntensity = 0.6;
+                } else {
+                    mesh.material.emissiveIntensity = 0.25;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // ========== START ==========
+        document.getElementById('start-btn').addEventListener('click', () => {
+            document.getElementById('start-screen').style.display = 'none';
+            // Start the render loop first so the 3D world is visible
+            animate();
+            // Try to lock pointer (requires user gesture - this click counts)
+            setTimeout(() => {
+                try { controls.lock(); } catch(e) {}
+            }, 100);
+        });
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Prevent context menu
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
